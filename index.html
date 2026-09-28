@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BALEREOT COMMUNITY — Creator Panel</title>
+<style>
+:root{--bg:#070a11;--card:#101722;--line:#243044;--text:#eef2ff;--muted:#94a3b8;--blue:#3b82f6;--red:#ef4444;--green:#22c55e}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#070a11,#0b1220);color:var(--text);font:15px Arial,sans-serif}
+.wrap{max-width:1100px;margin:auto;padding:22px}.top{display:flex;justify-content:space-between;align-items:center;gap:15px}
+.brand{font-size:22px;font-weight:900;letter-spacing:.8px}.muted{color:var(--muted)}.card{background:rgba(16,23,34,.95);border:1px solid var(--line);border-radius:18px;padding:20px;margin:16px 0;box-shadow:0 10px 30px #0003}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+input,select,button{font:inherit;width:100%;padding:12px 13px;border-radius:11px;margin-top:9px;border:1px solid #334155;background:#0a101b;color:#fff}
+button{background:var(--blue);border:0;font-weight:700;cursor:pointer}button.secondary{background:#1e293b}button.danger{background:var(--red)}
+.row{display:flex;gap:8px}.row>*{flex:1}.hidden{display:none}.badge{display:inline-block;padding:6px 10px;border-radius:999px;background:#172554;color:#93c5fd;font-size:12px}
+.notice{padding:11px;border-radius:10px;background:#0b1220;border:1px solid var(--line);margin-top:10px;white-space:pre-wrap}
+table{width:100%;border-collapse:collapse;margin-top:12px}th,td{text-align:left;padding:10px;border-bottom:1px solid var(--line)}
+h1,h2,h3{margin-top:0}.small{font-size:12px}.ok{color:#86efac}.bad{color:#fca5a5}
+@media(max-width:600px){.wrap{padding:12px}.top{align-items:flex-start;flex-direction:column}.row{flex-direction:column}}
+</style>
+</head>
+<body><div class="wrap">
+<header class="top">
+<div><div class="brand">BALEREOT COMMUNITY</div><div class="muted">Roblox Creator Panel</div></div>
+<button id="logout" class="secondary hidden" onclick="logout()">Keluar</button>
+</header>
+
+<section id="gate" class="card">
+<h2>Masuk Creator Panel</h2>
+<p class="muted">Gunakan username Roblox yang sudah disetujui admin.</p>
+<input id="user" placeholder="Username Roblox">
+<button onclick="userLogin()">Masuk</button>
+<div id="gateMsg" class="notice hidden"></div>
+</section>
+
+<section id="app" class="hidden">
+<div class="card"><span class="badge" id="sessionBadge"></span><h2>Upload Asset</h2>
+<div class="grid">
+<div>
+<label>Jenis Asset</label>
+<select id="assetType">
+<option>Model</option><option>Mesh</option><option>Audio</option><option>Animation</option><option>Image</option><option>Decal</option><option>Video</option>
+</select>
+<input id="displayName" placeholder="Nama asset">
+<input id="description" placeholder="Deskripsi">
+</div>
+<div>
+<label>Pembuat</label>
+<select id="creatorKind"><option value="userId">User ID</option><option value="groupId">Group ID</option></select>
+<input id="creatorId" placeholder="Masukkan ID Roblox">
+<input id="assetFile" type="file">
+<button onclick="uploadAsset()">Upload ke Roblox</button>
+</div>
+</div>
+<div id="uploadMsg" class="notice">API Key tidak dikirim ke browser.</div>
+</div>
+
+<section id="admin" class="hidden">
+<div class="card"><h2>Admin</h2><p class="muted">Kelola akses berbayar dan API Key Roblox.</p>
+<h3>Roblox API Key</h3>
+<input id="apiKey" type="password" placeholder="Masukkan API Key Roblox">
+<button onclick="saveApiKey()">Simpan / Ganti API Key</button>
+<div id="keyMsg" class="notice">Status: memeriksa…</div>
+</div>
+<div class="card"><h2>Whitelist Akses</h2>
+<div class="row"><input id="newUser" placeholder="Username Roblox"><button onclick="addUser()">Izinkan</button></div>
+<div id="users"></div>
+</div>
+</section>
+</section>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+async function api(path,opt={}){const r=await fetch(path,{...opt,headers:{...(opt.headers||{}),'content-type':opt.body instanceof FormData?undefined:'application/json'}});let d={};try{d=await r.json()}catch{};if(!r.ok)throw new Error(d.message||'Request gagal');return d}
+async function userLogin(){try{const username=$('user').value.trim();if(!username)return;
+ const d=await api('/api/login',{method:'POST',body:JSON.stringify({username})});
+ if(!d.allowed){$('gateMsg').classList.remove('hidden');$('gateMsg').textContent='Akses ditolak. Username belum diizinkan admin.';return}
+ $('gate').classList.add('hidden');$('app').classList.remove('hidden');$('logout').classList.remove('hidden');$('sessionBadge').textContent='Roblox: '+d.username+(d.admin?' • ADMIN':'');
+ if(d.admin){$('admin').classList.remove('hidden');await loadAdmin()}
+}catch(e){$('gateMsg').classList.remove('hidden');$('gateMsg').textContent=e.message}}
+async function saveApiKey(){try{const key=$('apiKey').value.trim();if(!key)return;
+ const d=await api('/api/admin/api-key',{method:'POST',body:JSON.stringify({key})});$('keyMsg').textContent=d.message;$('apiKey').value=''
+}catch(e){$('keyMsg').textContent=e.message}}
+async function addUser(){try{const username=$('newUser').value.trim();if(!username)return;
+ const d=await api('/api/admin/users',{method:'POST',body:JSON.stringify({username})});$('newUser').value='';await loadAdmin();alert(d.message)
+}catch(e){alert(e.message)}}
+async function removeUser(username){if(!confirm('Hapus akses '+username+'?'))return;try{await api('/api/admin/users/'+encodeURIComponent(username),{method:'DELETE'});await loadAdmin()}catch(e){alert(e.message)}}
+async function loadAdmin(){try{
+ const s=await api('/api/admin/api-key');$('keyMsg').textContent=s.configured?'Status: API Key sudah tersimpan.':'Status: API Key belum diatur.';
+ const d=await api('/api/admin/users');$('users').innerHTML='<table><tr><th>Username</th><th>ID Roblox</th><th>Aksi</th></tr>'+d.users.map(u=>`<tr><td>${esc(u.username)}</td><td>${u.roblox_id||'-'}</td><td><button class="danger" onclick="removeUser('${escAttr(u.username)}')">Hapus</button></td></tr>`).join('')+'</table>'
+}catch(e){$('keyMsg').textContent=e.message}}
+async function uploadAsset(){try{
+ const f=$('assetFile').files[0];if(!f)return alert('Pilih file asset.');
+ const fd=new FormData();fd.append('fileContent',f);fd.append('assetType',$('assetType').value);fd.append('displayName',$('displayName').value);fd.append('description',$('description').value);fd.append('creatorKind',$('creatorKind').value);fd.append('creatorId',$('creatorId').value);
+ $('uploadMsg').textContent='Mengupload…';const d=await api('/api/upload',{method:'POST',body:fd});$('uploadMsg').textContent=d.message+(d.operationId?'\\nOperation: '+d.operationId:'')+(d.assetId?'\\nAsset ID: '+d.assetId:'')
+}catch(e){$('uploadMsg').textContent='Gagal: '+e.message}}
+async function logout(){await fetch('/api/logout',{method:'POST'});location.reload()}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function escAttr(s){return String(s).replace(/['\\]/g,'\\$&')}
+</script>
+</body></html>
